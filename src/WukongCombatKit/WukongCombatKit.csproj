@@ -1,0 +1,91 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>WukongCombatKit</AssemblyName>
+    <RootNamespace>WukongCombatKit</RootNamespace>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <OutputPath>bin\</OutputPath>
+    <Deterministic>true</Deterministic>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\WukongCombatKit.Core\*.cs" Link="Core\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>..\..\lib\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="CSharpModBase">
+      <HintPath>..\..\lib\CSharpModBase.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="BtlSvr.Main">
+      <HintPath>..\..\lib\BtlSvr.Main.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="b1.Native">
+      <HintPath>..\..\lib\b1.Native.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="b1.NativePlugins">
+      <HintPath>..\..\lib\b1.NativePlugins.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="b1.Managed">
+      <HintPath>..\..\lib\b1.Managed.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="B1UI_GSE.Script">
+      <HintPath>..\..\lib\B1UI_GSE.Script.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GSE.Core">
+      <HintPath>..\..\lib\GSE.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GSE.GSNet">
+      <HintPath>..\..\lib\GSE.GSNet.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GSE.GSSdk">
+      <HintPath>..\..\lib\GSE.GSSdk.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GSE.OnlineBase">
+      <HintPath>..\..\lib\GSE.OnlineBase.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GSE.ProtobufDB">
+      <HintPath>..\..\lib\GSE.ProtobufDB.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnrealEngine">
+      <HintPath>..\..\lib\UnrealEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnrealEngine.Runtime">
+      <HintPath>..\..\lib\UnrealEngine.Runtime.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ILRuntime">
+      <HintPath>..\..\lib\ILRuntime.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="LitJson">
+      <HintPath>..\..\lib\LitJson.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Google.Protobuf">
+      <HintPath>..\..\lib\Google.Protobuf.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+</Project>

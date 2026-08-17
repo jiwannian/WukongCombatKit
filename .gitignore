@@ -1,0 +1,12 @@
+bin/
+obj/
+lib/
+.vs/
+.idea/
+.superpowers/
+*.user
+*.suo
+*.log
+*.dll.bak*
+*.analysis.txt
+WukongCombatKit.slnx
