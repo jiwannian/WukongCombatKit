@@ -1,5 +1,5 @@
 {
-  "EnableDodgeCancel": true,
+  "EnableImmediateDodge": true,
   "EnableOmniHit": true,
   "MaxAttackRange": 2500,
   "DebugLog": false

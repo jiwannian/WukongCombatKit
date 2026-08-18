@@ -24,7 +24,8 @@ namespace WukongCombatKit
                 DodgeCancel.Register(_harmony);
                 OmniHit.Register(_harmony);
                 CSharpModBase.Utils.RegisterKeyBind(CSharpModBase.Input.Key.F8, ReloadConfig);
-                ModLog.Info("Init finished. DodgeCancel=" + ConfigStore.Current.EnableDodgeCancel +
+                CSharpModBase.Utils.RegisterKeyBind(CSharpModBase.Input.Key.F7, ToggleImmediateDodge);
+                ModLog.Info("Init finished. ImmediateDodge=" + ConfigStore.Current.EnableDodgeCancel +
                             " OmniHit=" + ConfigStore.Current.EnableOmniHit +
                             " MaxAttackRange=" + ConfigStore.Current.MaxAttackRange);
             }
@@ -54,8 +55,14 @@ namespace WukongCombatKit
         private static void ReloadConfig()
         {
             ConfigStore.Reload();
-            ModLog.Info("Config reloaded. DodgeCancel=" + ConfigStore.Current.EnableDodgeCancel +
+            ModLog.Info("Config reloaded. ImmediateDodge=" + ConfigStore.Current.EnableDodgeCancel +
                         " OmniHit=" + ConfigStore.Current.EnableOmniHit);
+        }
+
+        private static void ToggleImmediateDodge()
+        {
+            ConfigStore.ToggleImmediateDodge();
+            ModLog.Info("ImmediateDodge=" + (ConfigStore.Current.EnableDodgeCancel ? "ON" : "OFF"));
         }
 
         public static BGUCharacterCS GetPlayerCharacter()

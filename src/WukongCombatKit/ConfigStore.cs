@@ -35,5 +35,34 @@ namespace WukongCombatKit
         {
             Load();
         }
+
+        public static void SetImmediateDodge(bool enabled)
+        {
+            Current.EnableDodgeCancel = enabled;
+            Save();
+        }
+
+        public static void ToggleImmediateDodge()
+        {
+            SetImmediateDodge(!Current.EnableDodgeCancel);
+        }
+
+        public static void Save()
+        {
+            try
+            {
+                string directory = Path.GetDirectoryName(RelativeConfigPath);
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                File.WriteAllText(RelativeConfigPath, Current.ToJson());
+            }
+            catch (Exception ex)
+            {
+                ModLog.Error("Config save failed: " + ex.Message);
+            }
+        }
     }
 }

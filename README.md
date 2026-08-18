@@ -4,8 +4,8 @@
 
 ## 功能
 
-1. **立刻闪避**  
-   按下闪避键时，只要角色在攻击或闪避中，就立即开始这次闪避。可打断普攻，也可无间隔接下一次翻滚。蓄力、法术、变身、受击硬直以外的死亡/假死仍不能闪。
+1. **立刻闪避（可选）**  
+   打开后，按下闪避键时只要角色在攻击或闪避中，就立即开始这次闪避。可打断普攻，也可无间隔接下一次翻滚。关闭后完全回到原版闪避窗口。死亡/假死仍不能闪。
 
 2. **有限范围全方位攻击**  
    玩家攻击以自身为中心做球形检测，默认距离 `2500`。背后、侧面、空中、高处的敌人，以及附近可打碎/可交互物品，只要没有真正隔墙，都能被这次攻击打中。隔墙仍不命中。伤害和削韧走原版流程。
@@ -34,14 +34,26 @@ BlackMythWukong/b1/Binaries/Win64/CSharpLoader/Mods/WukongCombatKit/WukongCombat
 
 ```json
 {
-  "EnableDodgeCancel": true,
+  "EnableImmediateDodge": true,
   "EnableOmniHit": true,
   "MaxAttackRange": 2500,
   "DebugLog": false
 }
 ```
 
-`F8` 重新读取配置。关闭对应开关后该功能立即回到原版行为。
+| 项 | 作用 |
+|---|---|
+| `EnableImmediateDodge` | 立刻闪避。`true` 打开，`false` 关闭并回到原版闪避 |
+| `EnableOmniHit` | 有限范围全方位攻击 |
+| `MaxAttackRange` | 全方位攻击半径，默认 `2500` |
+| `DebugLog` | 调试日志 |
+
+游戏内快捷键：
+
+- `F7` 开关立刻闪避，并写回 `config.json`
+- `F8` 重新读取配置
+
+关闭对应开关后该功能立即回到原版行为。
 
 ## 范围
 

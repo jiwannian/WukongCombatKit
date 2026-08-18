@@ -33,5 +33,12 @@ namespace WukongCombatKit.Tests
             Assert.True(config.EnableOmniHit);
             Assert.Equal(2500f, config.MaxAttackRange);
         }
+
+        [Fact]
+        public void ImmediateDodgeAliasOverridesLegacyKey()
+        {
+            CombatKitConfig config = CombatKitConfig.Parse("{\"EnableDodgeCancel\": true, \"EnableImmediateDodge\": false}");
+            Assert.False(config.EnableDodgeCancel);
+        }
     }
 }

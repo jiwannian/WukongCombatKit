@@ -27,7 +27,8 @@ namespace WukongCombatKit.Core
             }
 
             bool enableDodgeCancel;
-            if (TryReadBool(json, "EnableDodgeCancel", out enableDodgeCancel))
+            if (TryReadBool(json, "EnableImmediateDodge", out enableDodgeCancel) ||
+                TryReadBool(json, "EnableDodgeCancel", out enableDodgeCancel))
             {
                 config.EnableDodgeCancel = enableDodgeCancel;
             }
@@ -76,6 +77,16 @@ namespace WukongCombatKit.Core
             }
 
             return float.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+        }
+
+        public string ToJson()
+        {
+            return "{" + Environment.NewLine +
+                   "  \"EnableImmediateDodge\": " + (EnableDodgeCancel ? "true" : "false") + "," + Environment.NewLine +
+                   "  \"EnableOmniHit\": " + (EnableOmniHit ? "true" : "false") + "," + Environment.NewLine +
+                   "  \"MaxAttackRange\": " + MaxAttackRange.ToString(CultureInfo.InvariantCulture) + "," + Environment.NewLine +
+                   "  \"DebugLog\": " + (DebugLog ? "true" : "false") + Environment.NewLine +
+                   "}" + Environment.NewLine;
         }
     }
 }
