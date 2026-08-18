@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using b1;
 using BtlShare;
@@ -48,21 +49,30 @@ namespace WukongCombatKit
             try
             {
                 MethodInfo checkDodgeState = AccessTools.Method(typeof(GSSkillCastChecker), "CheckDodgeState");
-                if (checkDodgeState == null)
+                if (checkDodgeState != null)
                 {
-                    ModLog.Error("DodgeCancel CheckDodgeState not found");
-                    return;
+                    harmony.Patch(checkDodgeState, postfix: new HarmonyMethod(typeof(DodgeCancel), nameof(CheckPassPostfix)));
+                    ModLog.Info("Patch registered: GSSkillCastChecker.CheckDodgeState");
+                    Available = true;
                 }
 
-                harmony.Patch(
-                    checkDodgeState,
-                    postfix: new HarmonyMethod(typeof(DodgeCancel), nameof(CheckDodgeStatePostfix)));
-                ModLog.Info("Patch registered: GSSkillCastChecker.CheckDodgeState");
-                Available = true;
+                MethodInfo checkState = AccessTools.Method(typeof(GSSkillCastChecker), "CheckState");
+                if (checkState != null)
+                {
+                    harmony.Patch(checkState, postfix: new HarmonyMethod(typeof(DodgeCancel), nameof(CheckPassPostfix)));
+                    ModLog.Info("Patch registered: GSSkillCastChecker.CheckState");
+                }
+
+                MethodInfo checkCoolDown = AccessTools.Method(typeof(GSSkillCastChecker), "CheckCoolDown");
+                if (checkCoolDown != null)
+                {
+                    harmony.Patch(checkCoolDown, postfix: new HarmonyMethod(typeof(DodgeCancel), nameof(CheckPassPostfix)));
+                    ModLog.Info("Patch registered: GSSkillCastChecker.CheckCoolDown");
+                }
             }
             catch (Exception ex)
             {
-                ModLog.Error("DodgeCancel CheckDodgeState patch failed: " + ex.Message);
+                ModLog.Error("DodgeCancel checker patch failed: " + ex.Message);
             }
         }
 
@@ -81,7 +91,7 @@ namespace WukongCombatKit
                     return true;
                 }
 
-                OpenDodgeWindow(player);
+                PrepareImmediateDodge(player);
                 ESkillDirection direction = ReadDodgeDirection(player);
                 if (_triggerDodge != null)
                 {
@@ -92,16 +102,22 @@ namespace WukongCombatKit
                 {
                     _tryTriggerRealDodge.Invoke(__instance, null);
                 }
-                else
+
+                BUS_GSEventCollection events = BUS_EventCollectionCS.Get(player);
+                if (events != null)
                 {
-                    BUS_GSEventCollection events = BUS_EventCollectionCS.Get(player);
-                    if (events != null)
+                    if (events.Evt_BeginPreciseDodge != null)
                     {
                         events.Evt_BeginPreciseDodge.Invoke(direction);
                     }
+
+                    if (events.Evt_TriggerRollSkill != null)
+                    {
+                        events.Evt_TriggerRollSkill.Invoke(direction);
+                    }
                 }
 
-                ModLog.Debug("Same-frame dodge cancel from light attack");
+                ModLog.Debug("Immediate dodge from attack or roll");
                 return false;
             }
             catch (Exception ex)
@@ -111,7 +127,7 @@ namespace WukongCombatKit
             }
         }
 
-        public static void CheckDodgeStatePostfix(object __instance, ref bool __result)
+        public static void CheckPassPostfix(object __instance, ref bool __result)
         {
             try
             {
@@ -121,15 +137,14 @@ namespace WukongCombatKit
                 }
 
                 BGUCharacterCS player = MyMod.GetPlayerCharacter();
-                if (ShouldAllow(player))
+                if (ShouldAllow(player) && IsCheckingRollSkill(__instance))
                 {
                     __result = true;
-                    ModLog.Debug("CheckDodgeState allowed for light-attack cancel");
                 }
             }
             catch (Exception ex)
             {
-                ModLog.Error("DodgeCancel CheckDodgeState: " + ex.Message);
+                ModLog.Error("DodgeCancel checker: " + ex.Message);
             }
         }
 
@@ -144,7 +159,6 @@ namespace WukongCombatKit
             {
                 IBUC_UnitStateData unitState = BGU_DataUtil.GetReadOnlyData<IBUC_UnitStateData, BUC_UnitStateData>(player);
                 IBUC_SkillInstsData skillInsts = BGU_DataUtil.GetReadOnlyData<IBUC_SkillInstsData, BUC_SkillInstsData>(player);
-                IBUC_ChargeSkillData charge = BGU_DataUtil.GetReadOnlyData<IBUC_ChargeSkillData, BUC_ChargeSkillData>(player);
                 if (unitState == null)
                 {
                     return false;
@@ -162,21 +176,6 @@ namespace WukongCombatKit
                     }
                 }
 
-                bool transforming = false;
-                try
-                {
-                    AController controller = player.GetController();
-                    if (controller != null)
-                    {
-                        IBPC_PlayerTagData tags = BGU_DataUtil.GetReadOnlyData<IBPC_PlayerTagData, BPC_PlayerTagData>(controller);
-                        transforming = tags != null && tags.HasTag(EBGPPlayerTag.Transforming);
-                    }
-                }
-                catch
-                {
-                    transforming = false;
-                }
-
                 bool alreadyDodging = DodgeCancelRules.IsRollSkill(skillType) || unitState.HasState(EBGUUnitState.InDodgeWindow);
                 return DodgeCancelRules.ShouldAllowDodgeCancel(new DodgeCancelContext
                 {
@@ -185,12 +184,8 @@ namespace WukongCombatKit
                     IsAttacking = unitState.HasState(EBGUUnitState.Attacking),
                     IsBeatback = unitState.HasState(EBGUUnitState.Beatback),
                     IsDeadOrDying = unitState.HasState(EBGUUnitState.Dead) || unitState.HasState(EBGUUnitState.LifeSavingHair_FakeDead),
-                    IsCharging = charge != null && charge.IsCastingChargeSkill,
-                    IsTransforming = transforming,
                     IsAlreadyDodging = alreadyDodging,
                     AllowCancelCurrentDodge = true,
-                    IsCastingMagic = unitState.HasState(EBGUUnitState.InMagicWindow) && !string.IsNullOrEmpty(skillType) && !DodgeCancelRules.IsNormalStaffAttack(skillType) && !DodgeCancelRules.IsRollSkill(skillType),
-                    IsCastingVigor = unitState.HasState(EBGUUnitState.InVigorWindow),
                     SkillType = skillType,
                     LastAction = lastAction
                 });
@@ -201,7 +196,7 @@ namespace WukongCombatKit
             }
         }
 
-        private static void OpenDodgeWindow(BGUCharacterCS player)
+        private static void PrepareImmediateDodge(BGUCharacterCS player)
         {
             BUS_GSEventCollection events = BUS_EventCollectionCS.Get(player);
             if (events == null)
@@ -209,7 +204,101 @@ namespace WukongCombatKit
                 return;
             }
 
+            try
+            {
+                if (events.Evt_UnitTryBreakSkill != null)
+                {
+                    events.Evt_UnitTryBreakSkill.Invoke("WukongCombatKit.ImmediateDodge");
+                }
+            }
+            catch (Exception ex)
+            {
+                ModLog.Debug("Skill break skipped: " + ex.Message);
+            }
+
+            events.Evt_UnitStateTrigger.Invoke(EBUStateTrigger.SkillBreak, 0f, true);
             events.Evt_UnitStateTrigger.Invoke(EBUStateTrigger.EnterDodgeWindow, 0.25f, true);
+
+            ResetRollCombo(player);
+            ClearRollCooldown(player);
+        }
+
+        private static void ResetRollCombo(BGUCharacterCS player)
+        {
+            try
+            {
+                BUC_RollData roll = BGU_DataUtil.GetUnPersistentReadOnlyData<BUC_RollData>(player);
+                if (roll != null)
+                {
+                    roll.CurStateIndex = 0;
+                    roll.bCastRollingSkill = false;
+                }
+            }
+            catch (Exception)
+            {
+            }
+        }
+
+        private static void ClearRollCooldown(BGUCharacterCS player)
+        {
+            try
+            {
+                BUC_SkillInstsData skillInsts = BGU_DataUtil.GetUnPersistentReadOnlyData<BUC_SkillInstsData>(player);
+                if (skillInsts == null)
+                {
+                    return;
+                }
+
+                FieldInfo field = AccessTools.Field(typeof(BUC_SkillInstsData), "SkillCanCastCooldownRemainingTime");
+                Dictionary<int, float> cooldown = field != null ? field.GetValue(skillInsts) as Dictionary<int, float> : null;
+                if (cooldown == null)
+                {
+                    return;
+                }
+
+                BUC_RollData roll = BGU_DataUtil.GetUnPersistentReadOnlyData<BUC_RollData>(player);
+                if (roll != null && roll.RollCombo != null)
+                {
+                    for (int i = 0; i < roll.RollCombo.Count; i++)
+                    {
+                        cooldown[roll.RollCombo[i]] = 0f;
+                    }
+                }
+
+                if (skillInsts.CurrentCastingSkillID > 0)
+                {
+                    cooldown[skillInsts.CurrentCastingSkillID] = 0f;
+                }
+            }
+            catch (Exception)
+            {
+            }
+        }
+
+        private static bool IsCheckingRollSkill(object checker)
+        {
+            if (checker == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                FieldInfo descField = AccessTools.Field(checker.GetType(), "SkillSDesc");
+                object desc = descField != null ? descField.GetValue(checker) : null;
+                if (desc == null)
+                {
+                    return true;
+                }
+
+                PropertyInfo typeProp = AccessTools.Property(desc.GetType(), "SkillType");
+                object skillType = typeProp != null ? typeProp.GetValue(desc, null) : null;
+                return skillType != null && string.Equals(skillType.ToString(), "RollSkill", StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception)
+            {
+                return true;
+            }
         }
 
         private static ESkillDirection ReadDodgeDirection(BGUCharacterCS player)

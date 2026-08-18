@@ -28,37 +28,17 @@ namespace WukongCombatKit.Core
                 return false;
             }
 
-            if (context.IsBeatback || context.IsDeadOrDying)
+            if (context.IsDeadOrDying)
             {
                 return false;
             }
 
-            if (context.IsCharging || context.IsTransforming || context.IsCastingMagic || context.IsCastingVigor)
-            {
-                return false;
-            }
-
-            if (context.AllowCancelCurrentDodge && (context.IsAlreadyDodging || IsRollSkill(context.SkillType)))
+            if (context.IsAttacking || context.IsAlreadyDodging || context.AllowCancelCurrentDodge || IsRollSkill(context.SkillType))
             {
                 return true;
             }
 
-            if (!context.IsAttacking)
-            {
-                return false;
-            }
-
-            if (context.IsAlreadyDodging)
-            {
-                return false;
-            }
-
-            if (!IsLightAttackCombo(context.SkillType, context.LastAction))
-            {
-                return false;
-            }
-
-            return true;
+            return false;
         }
 
         public static bool IsLightAttackCombo(string skillType, string lastAction)

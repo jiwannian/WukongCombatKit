@@ -40,11 +40,11 @@ namespace WukongCombatKit.Tests
         }
 
         [Fact]
-        public void ChargeOrSpellOrTransform_DoesNotAllowDodgeCancel()
+        public void ChargeOrSpellOrTransform_AllowsDodgeWhenAttacking()
         {
-            Assert.False(DodgeCancelRules.ShouldAllowDodgeCancel(CreateBlocked("ChargeSkillBegin", "HeavyAttack")));
-            Assert.False(DodgeCancelRules.ShouldAllowDodgeCancel(CreateBlocked("NormalSkill", "SpellCast") ));
-            Assert.False(DodgeCancelRules.ShouldAllowDodgeCancel(new DodgeCancelContext
+            Assert.True(DodgeCancelRules.ShouldAllowDodgeCancel(CreateBlocked("ChargeSkillBegin", "HeavyAttack")));
+            Assert.True(DodgeCancelRules.ShouldAllowDodgeCancel(CreateBlocked("NormalSkill", "SpellCast")));
+            Assert.True(DodgeCancelRules.ShouldAllowDodgeCancel(new DodgeCancelContext
             {
                 Enabled = true,
                 IsLocalPlayer = true,
@@ -52,24 +52,6 @@ namespace WukongCombatKit.Tests
                 IsCharging = true,
                 SkillType = "ChargeSkillBegin",
                 LastAction = "HeavyAttack"
-            }));
-            Assert.False(DodgeCancelRules.ShouldAllowDodgeCancel(new DodgeCancelContext
-            {
-                Enabled = true,
-                IsLocalPlayer = true,
-                IsAttacking = true,
-                IsTransforming = true,
-                SkillType = "NormalSkill",
-                LastAction = "Transform"
-            }));
-            Assert.False(DodgeCancelRules.ShouldAllowDodgeCancel(new DodgeCancelContext
-            {
-                Enabled = true,
-                IsLocalPlayer = true,
-                IsAttacking = true,
-                IsCastingMagic = true,
-                SkillType = "NormalSkill",
-                LastAction = "Magic"
             }));
         }
 
@@ -95,9 +77,9 @@ namespace WukongCombatKit.Tests
         }
 
         [Fact]
-        public void Beatback_DoesNotAllowDodgeCancel()
+        public void BeatbackDuringAttack_AllowsDodgeCancel()
         {
-            Assert.False(DodgeCancelRules.ShouldAllowDodgeCancel(new DodgeCancelContext
+            Assert.True(DodgeCancelRules.ShouldAllowDodgeCancel(new DodgeCancelContext
             {
                 Enabled = true,
                 IsLocalPlayer = true,
@@ -109,13 +91,20 @@ namespace WukongCombatKit.Tests
         }
 
         [Fact]
-        public void AlreadyDodging_AllowsImmediateNextDodge()
+        public void AttackOrDodge_AllowsImmediateDodge()
         {
             Assert.True(DodgeCancelRules.ShouldAllowDodgeCancel(new DodgeCancelContext
             {
                 Enabled = true,
                 IsLocalPlayer = true,
                 IsAttacking = true,
+                SkillType = "ChargeSkillBegin",
+                LastAction = "HeavyAttack"
+            }));
+            Assert.True(DodgeCancelRules.ShouldAllowDodgeCancel(new DodgeCancelContext
+            {
+                Enabled = true,
+                IsLocalPlayer = true,
                 IsAlreadyDodging = true,
                 AllowCancelCurrentDodge = true,
                 SkillType = "RollSkill",
