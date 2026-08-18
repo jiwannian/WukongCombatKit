@@ -14,6 +14,8 @@ namespace WukongCombatKit
         public static bool Available { get; private set; }
         private static Type _sweepCompType;
         private static MethodInfo _onSweepCheckHit;
+        private static string _lastSweepKey;
+        private static long _lastSweepTicks;
 
         public static void Register(Harmony harmony)
         {
@@ -143,6 +145,15 @@ namespace WukongCombatKit
                 return;
             }
 
+            string sweepKey = player.GetUniqueID() + ":" + notifyId + ":" + config.TriggerSkillID;
+            long now = DateTime.UtcNow.Ticks;
+            if (sweepKey == _lastSweepKey && now - _lastSweepTicks < TimeSpan.FromMilliseconds(50).Ticks)
+            {
+                return;
+            }
+
+            _lastSweepKey = sweepKey;
+            _lastSweepTicks = now;
             ApplyOmniHits(sweepComp, player, config, notifyId);
         }
 
@@ -195,6 +206,7 @@ namespace WukongCombatKit
 
         private static void CollectCharacters(UWorld world, BGUPlayerCharacterCS player, FVector origin, List<OmniHitCandidate> candidates, Dictionary<string, AActor> byId)
         {
+            float maxRange = ConfigStore.Current.MaxAttackRange;
             List<BGUCharacterCS> characters = new List<BGUCharacterCS>(UGameplayStatics.GetAllActorsOfClass<BGUCharacterCS>(world));
             for (int i = 0; i < characters.Count; i++)
             {
@@ -205,6 +217,11 @@ namespace WukongCombatKit
                 }
 
                 FVector target = RaisedPoint(character);
+                if ((target - origin).Size() > maxRange)
+                {
+                    continue;
+                }
+
                 bool isEnemy = false;
                 try
                 {
@@ -235,6 +252,7 @@ namespace WukongCombatKit
                 return;
             }
 
+            float maxRange = ConfigStore.Current.MaxAttackRange;
             foreach (T actor in actors)
             {
                 if (actor == null)
@@ -242,7 +260,13 @@ namespace WukongCombatKit
                     continue;
                 }
 
-                AddCandidate(candidates, byId, player, actor, origin, RaisedPoint(actor), false, true);
+                FVector target = RaisedPoint(actor);
+                if ((target - origin).Size() > maxRange)
+                {
+                    continue;
+                }
+
+                AddCandidate(candidates, byId, player, actor, origin, target, false, true);
             }
         }
 
@@ -339,20 +363,9 @@ namespace WukongCombatKit
         {
             try
             {
-                FVector[] sampleOrigins = BuildSamplePoints(attacker, origin, true);
-                FVector[] sampleTargets = BuildSamplePoints(victim, target, false);
-                for (int i = 0; i < sampleOrigins.Length; i++)
-                {
-                    for (int j = 0; j < sampleTargets.Length; j++)
-                    {
-                        if (!IsSingleRayBlocked(world, sampleOrigins[i], sampleTargets[j], victim))
-                        {
-                            return false;
-                        }
-                    }
-                }
-
-                return true;
+                FVector from = attacker != null ? RaisedPoint(attacker) : origin;
+                FVector to = victim != null ? RaisedPoint(victim) : target;
+                return IsSingleRayBlocked(world, from, to, victim);
             }
             catch (Exception)
             {
@@ -401,32 +414,6 @@ namespace WukongCombatKit
                 (float)origin.Z,
                 (float)target.Z,
                 hitZ);
-        }
-
-        private static FVector[] BuildSamplePoints(AActor actor, FVector fallback, bool extraHigh)
-        {
-            FVector basePoint = fallback;
-            float halfHeight = 90f;
-            BGUCharacterCS character = actor as BGUCharacterCS;
-            if (character != null && character.CapsuleComponent != null)
-            {
-                halfHeight = Math.Max((float)character.CapsuleComponent.GetScaledCapsuleHalfHeight(), 80f);
-                basePoint = BGUFuncLibActorTransformCS.BGUGetActorLocation(character);
-            }
-            else if (actor != null)
-            {
-                basePoint = BGUFuncLibActorTransformCS.BGUGetActorLocation(actor);
-            }
-
-            float chest = Math.Max(halfHeight * 0.7f, 70f);
-            float head = Math.Max(halfHeight * 1.6f, 160f);
-            float high = extraHigh ? Math.Max(halfHeight * 2.4f, 280f) : Math.Max(halfHeight * 2.1f, 220f);
-            return new FVector[]
-            {
-                basePoint + FVector.UpVector * chest,
-                basePoint + FVector.UpVector * head,
-                basePoint + FVector.UpVector * high
-            };
         }
 
         private static FVector RaisedPoint(AActor actor)

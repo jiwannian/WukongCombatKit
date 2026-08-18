@@ -1,6 +1,6 @@
 {
   "EnableDodgeCancel": true,
   "EnableOmniHit": true,
-  "MaxAttackRange": 100000,
+  "MaxAttackRange": 2500,
   "DebugLog": false
 }

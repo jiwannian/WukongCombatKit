@@ -12,7 +12,7 @@ namespace WukongCombatKit.Tests
             List<string> hits = OmniHitRules.SelectVisibleTargets(new[]
             {
                 new OmniHitCandidate { Id = "front", Distance = 300f, IsEnemy = true },
-                new OmniHitCandidate { Id = "behind", Distance = 90000f, IsEnemy = true },
+                new OmniHitCandidate { Id = "behind", Distance = 2400f, IsEnemy = true },
                 new OmniHitCandidate { Id = "side", Distance = 12f, IsEnemy = true }
             }, CombatKitConfig.DefaultMaxAttackRange, false);
 
@@ -27,7 +27,7 @@ namespace WukongCombatKit.Tests
             List<string> hits = OmniHitRules.SelectVisibleTargets(new[]
             {
                 new OmniHitCandidate { Id = "walled", Distance = 10f, IsEnemy = true, WallBlocked = true },
-                new OmniHitCandidate { Id = "far", Distance = 100001f, IsEnemy = true },
+                new OmniHitCandidate { Id = "far", Distance = 2501f, IsEnemy = true },
                 new OmniHitCandidate { Id = "self", Distance = 0f, IsSelf = true, IsEnemy = false },
                 new OmniHitCandidate { Id = "ally", Distance = 20f, IsAlly = true },
                 new OmniHitCandidate { Id = "ok", Distance = 20f, IsEnemy = true }
@@ -59,7 +59,7 @@ namespace WukongCombatKit.Tests
             OmniHitCandidate crate = new OmniHitCandidate
             {
                 Id = "crate",
-                Distance = 90000f,
+                Distance = 1800f,
                 IsSceneObject = true
             };
 

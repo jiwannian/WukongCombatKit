@@ -6,7 +6,7 @@ namespace WukongCombatKit.Core
 {
     public sealed class CombatKitConfig
     {
-        public const float DefaultMaxAttackRange = 100000f;
+        public const float DefaultMaxAttackRange = 2500f;
 
         public bool EnableDodgeCancel { get; set; } = true;
         public bool EnableOmniHit { get; set; } = true;

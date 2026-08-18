@@ -11,7 +11,7 @@ namespace WukongCombatKit.Tests
             CombatKitConfig config = CombatKitConfig.Parse(null);
             Assert.True(config.EnableDodgeCancel);
             Assert.True(config.EnableOmniHit);
-            Assert.Equal(100000f, config.MaxAttackRange);
+            Assert.Equal(2500f, config.MaxAttackRange);
             Assert.False(config.DebugLog);
         }
 
@@ -21,7 +21,7 @@ namespace WukongCombatKit.Tests
             CombatKitConfig config = CombatKitConfig.Parse("{\"EnableOmniHit\": false, \"DebugLog\": true}");
             Assert.True(config.EnableDodgeCancel);
             Assert.False(config.EnableOmniHit);
-            Assert.Equal(100000f, config.MaxAttackRange);
+            Assert.Equal(2500f, config.MaxAttackRange);
             Assert.True(config.DebugLog);
         }
 
@@ -31,7 +31,7 @@ namespace WukongCombatKit.Tests
             CombatKitConfig config = CombatKitConfig.Parse("{not-json");
             Assert.True(config.EnableDodgeCancel);
             Assert.True(config.EnableOmniHit);
-            Assert.Equal(100000f, config.MaxAttackRange);
+            Assert.Equal(2500f, config.MaxAttackRange);
         }
     }
 }
