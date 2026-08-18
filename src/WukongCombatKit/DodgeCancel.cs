@@ -177,6 +177,7 @@ namespace WukongCombatKit
                     transforming = false;
                 }
 
+                bool alreadyDodging = DodgeCancelRules.IsRollSkill(skillType) || unitState.HasState(EBGUUnitState.InDodgeWindow);
                 return DodgeCancelRules.ShouldAllowDodgeCancel(new DodgeCancelContext
                 {
                     Enabled = ConfigStore.Current.EnableDodgeCancel,
@@ -186,8 +187,9 @@ namespace WukongCombatKit
                     IsDeadOrDying = unitState.HasState(EBGUUnitState.Dead) || unitState.HasState(EBGUUnitState.LifeSavingHair_FakeDead),
                     IsCharging = charge != null && charge.IsCastingChargeSkill,
                     IsTransforming = transforming,
-                    IsAlreadyDodging = unitState.HasState(EBGUUnitState.InDodgeWindow) && string.Equals(skillType, "RollSkill", StringComparison.OrdinalIgnoreCase),
-                    IsCastingMagic = unitState.HasState(EBGUUnitState.InMagicWindow) && !string.IsNullOrEmpty(skillType) && !DodgeCancelRules.IsNormalStaffAttack(skillType),
+                    IsAlreadyDodging = alreadyDodging,
+                    AllowCancelCurrentDodge = true,
+                    IsCastingMagic = unitState.HasState(EBGUUnitState.InMagicWindow) && !string.IsNullOrEmpty(skillType) && !DodgeCancelRules.IsNormalStaffAttack(skillType) && !DodgeCancelRules.IsRollSkill(skillType),
                     IsCastingVigor = unitState.HasState(EBGUUnitState.InVigorWindow),
                     SkillType = skillType,
                     LastAction = lastAction

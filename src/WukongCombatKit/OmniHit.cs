@@ -155,66 +155,22 @@ namespace WukongCombatKit
             }
 
             FVector origin = RaisedPoint(player);
-            List<BGUCharacterCS> characters = new List<BGUCharacterCS>(UGameplayStatics.GetAllActorsOfClass<BGUCharacterCS>(world));
-            if (characters.Count == 0)
-            {
-                return;
-            }
-
             List<OmniHitCandidate> candidates = new List<OmniHitCandidate>();
-            Dictionary<string, BGUCharacterCS> byId = new Dictionary<string, BGUCharacterCS>();
-            bool originalHitsSceneObjects = config.EffectIDListForSceneItem != null && config.EffectIDListForSceneItem.Count > 0;
+            Dictionary<string, AActor> byId = new Dictionary<string, AActor>();
 
-            for (int i = 0; i < characters.Count; i++)
-            {
-                BGUCharacterCS character = characters[i];
-                if (character == null || character == player)
-                {
-                    continue;
-                }
-
-                FVector target = RaisedPoint(character);
-                float distance = (float)(target - origin).Size();
-                bool isEnemy = false;
-                try
-                {
-                    isEnemy = BGUFunctionLibraryCS.BGUIsEnemyTeam(player, character);
-                }
-                catch
-                {
-                    isEnemy = false;
-                }
-
-                string id = character.GetUniqueID().ToString();
-                candidates.Add(new OmniHitCandidate
-                {
-                    Id = id,
-                    Distance = distance,
-                    IsSelf = false,
-                    IsAlly = !isEnemy,
-                    IsEnemy = isEnemy,
-                    IsSceneObject = false,
-                    WallBlocked = IsWallBlocked(world, origin, target, character)
-                });
-                byId[id] = character;
-            }
+            CollectCharacters(world, player, origin, candidates, byId);
+            CollectSceneItems(world, player, origin, candidates, byId);
 
             List<string> selected = OmniHitRules.SelectVisibleTargets(
                 candidates,
                 ConfigStore.Current.MaxAttackRange,
-                originalHitsSceneObjects);
-
-            if (_onSweepCheckHit == null || sweepComp == null)
-            {
-                ModLog.Error("OmniHit disabled: OnSweepCheckHit not found");
-                return;
-            }
+                true);
 
             HashSet<string> injectedThisSweep = new HashSet<string>();
             int injected = 0;
             foreach (string id in selected)
             {
-                BGUCharacterCS victim;
+                AActor victim;
                 if (!byId.TryGetValue(id, out victim) || victim == null)
                 {
                     continue;
@@ -225,12 +181,108 @@ namespace WukongCombatKit
                     continue;
                 }
 
+                if (ApplyHitToActor(sweepComp, player, config, notifyId, origin, victim))
+                {
+                    injected++;
+                }
+            }
+
+            if (injected > 0)
+            {
+                ModLog.Debug("OmniHit injected " + injected + " targets");
+            }
+        }
+
+        private static void CollectCharacters(UWorld world, BGUPlayerCharacterCS player, FVector origin, List<OmniHitCandidate> candidates, Dictionary<string, AActor> byId)
+        {
+            List<BGUCharacterCS> characters = new List<BGUCharacterCS>(UGameplayStatics.GetAllActorsOfClass<BGUCharacterCS>(world));
+            for (int i = 0; i < characters.Count; i++)
+            {
+                BGUCharacterCS character = characters[i];
+                if (character == null || character == player)
+                {
+                    continue;
+                }
+
+                FVector target = RaisedPoint(character);
+                bool isEnemy = false;
                 try
                 {
-                    FEffectInstReq req = new FEffectInstReq(player);
-                    req.TriggerSkillId = config.TriggerSkillID;
-                    req.HitLocation = BGUFuncLibActorTransformCS.BGUGetActorLocation(victim);
-                    req.HitDiretionRealDir = (req.HitLocation - origin).GetSafeNormal();
+                    isEnemy = BGUFunctionLibraryCS.BGUIsEnemyTeam(player, character);
+                }
+                catch
+                {
+                    isEnemy = false;
+                }
+
+                AddCandidate(candidates, byId, character, origin, target, isEnemy, false);
+            }
+        }
+
+        private static void CollectSceneItems(UWorld world, BGUPlayerCharacterCS player, FVector origin, List<OmniHitCandidate> candidates, Dictionary<string, AActor> byId)
+        {
+            AddSceneActors(UGameplayStatics.GetAllActorsOfClass<BGUDestructibleActorBase>(world), origin, candidates, byId);
+            AddSceneActors(UGameplayStatics.GetAllActorsOfClass<BGUDroppableDestructionActorBase>(world), origin, candidates, byId);
+            AddSceneActors(UGameplayStatics.GetAllActorsOfClass<BGUFXActorBase>(world), origin, candidates, byId);
+            AddSceneActors(UGameplayStatics.GetAllActorsOfClass<BGUInteractiveActorBase>(world), origin, candidates, byId);
+            AddSceneActors(UGameplayStatics.GetAllActorsOfClass<BGUSceneItemBase>(world), origin, candidates, byId);
+        }
+
+        private static void AddSceneActors<T>(IEnumerable<T> actors, FVector origin, List<OmniHitCandidate> candidates, Dictionary<string, AActor> byId) where T : AActor
+        {
+            if (actors == null)
+            {
+                return;
+            }
+
+            foreach (T actor in actors)
+            {
+                if (actor == null)
+                {
+                    continue;
+                }
+
+                AddCandidate(candidates, byId, actor, origin, RaisedPoint(actor), false, true);
+            }
+        }
+
+        private static void AddCandidate(List<OmniHitCandidate> candidates, Dictionary<string, AActor> byId, AActor actor, FVector origin, FVector target, bool isEnemy, bool isSceneObject)
+        {
+            string id = actor.GetUniqueID().ToString();
+            if (byId.ContainsKey(id))
+            {
+                return;
+            }
+
+            candidates.Add(new OmniHitCandidate
+            {
+                Id = id,
+                Distance = (float)(target - origin).Size(),
+                IsSelf = false,
+                IsAlly = !isEnemy && !isSceneObject,
+                IsEnemy = isEnemy,
+                IsSceneObject = isSceneObject,
+                WallBlocked = IsWallBlocked(actor.World, origin, target, actor)
+            });
+            byId[id] = actor;
+        }
+
+        private static bool ApplyHitToActor(object sweepComp, BGUPlayerCharacterCS player, FSweepCheckUnitConfig config, string notifyId, FVector origin, AActor victim)
+        {
+            try
+            {
+                FEffectInstReq req = new FEffectInstReq(player);
+                req.TriggerSkillId = config.TriggerSkillID;
+                req.HitLocation = BGUFuncLibActorTransformCS.BGUGetActorLocation(victim);
+                req.HitDiretionRealDir = (req.HitLocation - origin).GetSafeNormal();
+
+                if (victim is BGUCharacterCS)
+                {
+                    if (_onSweepCheckHit == null)
+                    {
+                        return false;
+                    }
+
                     object[] args = new object[]
                     {
                         victim,
@@ -245,18 +297,42 @@ namespace WukongCombatKit
                         config.FromInstanceID
                     };
                     _onSweepCheckHit.Invoke(sweepComp, args);
-                    injected++;
+                    return true;
                 }
-                catch (Exception ex)
+
+                BUS_GSEventCollection victimEvents = BUS_EventCollectionCS.Get(victim);
+                if (victimEvents != null && victimEvents.Evt_HitDestructible != null)
                 {
-                    ModLog.Error("OmniHit inject failed: " + ex.Message);
+                    FHitDestructibleActorConfig hitConfig = config.HitDestructibleActorConfig;
+                    EGSHitDestructibleStrengthLevel strength = hitConfig.HitStrengthLevel;
+                    if (strength == EGSHitDestructibleStrengthLevel.None)
+                    {
+                        strength = EGSHitDestructibleStrengthLevel.Heavy;
+                    }
+
+                    EGSHitDestructibleDirection direction = hitConfig.HitDirection;
+                    float impulse = BGUFunctionLibraryCS.GetDestructibleImpulse(player, strength);
+                    victimEvents.Evt_HitDestructible.Invoke(player, strength, direction, req, impulse);
+                    return true;
                 }
+
+                BUS_GSEventCollection playerEvents = BUS_EventCollectionCS.Get(player);
+                if (playerEvents != null && config.EffectIDListForSceneItem != null)
+                {
+                    foreach (int effectId in config.EffectIDListForSceneItem)
+                    {
+                        playerEvents.Evt_TriggerSkillEffect.Invoke(effectId, req, victim);
+                    }
+
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                ModLog.Error("OmniHit inject failed: " + ex.Message);
             }
 
-            if (injected > 0)
-            {
-                ModLog.Debug("OmniHit injected " + injected + " targets");
-            }
+            return false;
         }
 
         private static bool IsWallBlocked(UWorld world, FVector origin, FVector target, AActor victim)

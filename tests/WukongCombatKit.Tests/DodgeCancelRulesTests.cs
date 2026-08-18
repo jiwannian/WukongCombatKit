@@ -95,7 +95,7 @@ namespace WukongCombatKit.Tests
         }
 
         [Fact]
-        public void BeatbackOrAlreadyDodging_DoesNotAllowDodgeCancel()
+        public void Beatback_DoesNotAllowDodgeCancel()
         {
             Assert.False(DodgeCancelRules.ShouldAllowDodgeCancel(new DodgeCancelContext
             {
@@ -106,14 +106,20 @@ namespace WukongCombatKit.Tests
                 SkillType = "NormalSkill",
                 LastAction = "LightAttack"
             }));
-            Assert.False(DodgeCancelRules.ShouldAllowDodgeCancel(new DodgeCancelContext
+        }
+
+        [Fact]
+        public void AlreadyDodging_AllowsImmediateNextDodge()
+        {
+            Assert.True(DodgeCancelRules.ShouldAllowDodgeCancel(new DodgeCancelContext
             {
                 Enabled = true,
                 IsLocalPlayer = true,
                 IsAttacking = true,
                 IsAlreadyDodging = true,
-                SkillType = "NormalSkill",
-                LastAction = "LightAttack"
+                AllowCancelCurrentDodge = true,
+                SkillType = "RollSkill",
+                LastAction = "Dodge"
             }));
         }
 

@@ -46,12 +46,12 @@ namespace WukongCombatKit.Tests
         }
 
         [Fact]
-        public void SceneObjectsOnlyWhenOriginalAttackWouldHitThem()
+        public void SceneObjectsAreSelectedWhenRequested()
         {
             OmniHitCandidate crate = new OmniHitCandidate
             {
                 Id = "crate",
-                Distance = 30f,
+                Distance = 90000f,
                 IsSceneObject = true
             };
 

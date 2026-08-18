@@ -12,6 +12,7 @@ namespace WukongCombatKit.Core
         public bool IsCharging { get; set; }
         public bool IsTransforming { get; set; }
         public bool IsAlreadyDodging { get; set; }
+        public bool AllowCancelCurrentDodge { get; set; }
         public bool IsCastingMagic { get; set; }
         public bool IsCastingVigor { get; set; }
         public string SkillType { get; set; }
@@ -27,17 +28,27 @@ namespace WukongCombatKit.Core
                 return false;
             }
 
-            if (!context.IsAttacking)
-            {
-                return false;
-            }
-
-            if (context.IsBeatback || context.IsDeadOrDying || context.IsAlreadyDodging)
+            if (context.IsBeatback || context.IsDeadOrDying)
             {
                 return false;
             }
 
             if (context.IsCharging || context.IsTransforming || context.IsCastingMagic || context.IsCastingVigor)
+            {
+                return false;
+            }
+
+            if (context.AllowCancelCurrentDodge && (context.IsAlreadyDodging || IsRollSkill(context.SkillType)))
+            {
+                return true;
+            }
+
+            if (!context.IsAttacking)
+            {
+                return false;
+            }
+
+            if (context.IsAlreadyDodging)
             {
                 return false;
             }
@@ -93,6 +104,11 @@ namespace WukongCombatKit.Core
             }
 
             return string.Equals(skillType, "NormalSkill", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static bool IsRollSkill(string skillType)
+        {
+            return string.Equals(skillType, "RollSkill", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool ContainsToken(string value, string token)
