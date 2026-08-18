@@ -65,7 +65,15 @@ namespace WukongCombatKit.Core
             return selected;
         }
 
-        public static bool IsTerrainBlocking(bool hitSomething, bool hitTargetOrAttached, float hitDistance, float targetDistance, float targetRadius)
+        public static bool IsTerrainBlocking(
+            bool hitSomething,
+            bool hitTargetOrAttached,
+            float hitDistance,
+            float targetDistance,
+            float targetRadius,
+            float originZ,
+            float targetZ,
+            float hitZ)
         {
             if (!hitSomething || hitTargetOrAttached)
             {
@@ -74,6 +82,20 @@ namespace WukongCombatKit.Core
 
             float nearTarget = Math.Max(targetRadius, 150f);
             if (hitDistance >= targetDistance - nearTarget)
+            {
+                return false;
+            }
+
+            float lowerZ = Math.Min(originZ, targetZ);
+            float upperZ = Math.Max(originZ, targetZ);
+            float verticalGap = upperZ - lowerZ;
+
+            if (hitZ < lowerZ - 40f)
+            {
+                return false;
+            }
+
+            if (verticalGap >= 120f && hitZ <= lowerZ + Math.Max(targetRadius, 80f))
             {
                 return false;
             }

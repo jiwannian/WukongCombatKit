@@ -215,20 +215,20 @@ namespace WukongCombatKit
                     isEnemy = false;
                 }
 
-                AddCandidate(candidates, byId, character, origin, target, isEnemy, false);
+                AddCandidate(candidates, byId, player, character, origin, target, isEnemy, false);
             }
         }
 
         private static void CollectSceneItems(UWorld world, BGUPlayerCharacterCS player, FVector origin, List<OmniHitCandidate> candidates, Dictionary<string, AActor> byId)
         {
-            AddSceneActors(UGameplayStatics.GetAllActorsOfClass<BGUDestructibleActorBase>(world), origin, candidates, byId);
-            AddSceneActors(UGameplayStatics.GetAllActorsOfClass<BGUDroppableDestructionActorBase>(world), origin, candidates, byId);
-            AddSceneActors(UGameplayStatics.GetAllActorsOfClass<BGUFXActorBase>(world), origin, candidates, byId);
-            AddSceneActors(UGameplayStatics.GetAllActorsOfClass<BGUInteractiveActorBase>(world), origin, candidates, byId);
-            AddSceneActors(UGameplayStatics.GetAllActorsOfClass<BGUSceneItemBase>(world), origin, candidates, byId);
+            AddSceneActors(player, UGameplayStatics.GetAllActorsOfClass<BGUDestructibleActorBase>(world), origin, candidates, byId);
+            AddSceneActors(player, UGameplayStatics.GetAllActorsOfClass<BGUDroppableDestructionActorBase>(world), origin, candidates, byId);
+            AddSceneActors(player, UGameplayStatics.GetAllActorsOfClass<BGUFXActorBase>(world), origin, candidates, byId);
+            AddSceneActors(player, UGameplayStatics.GetAllActorsOfClass<BGUInteractiveActorBase>(world), origin, candidates, byId);
+            AddSceneActors(player, UGameplayStatics.GetAllActorsOfClass<BGUSceneItemBase>(world), origin, candidates, byId);
         }
 
-        private static void AddSceneActors<T>(IEnumerable<T> actors, FVector origin, List<OmniHitCandidate> candidates, Dictionary<string, AActor> byId) where T : AActor
+        private static void AddSceneActors<T>(BGUPlayerCharacterCS player, IEnumerable<T> actors, FVector origin, List<OmniHitCandidate> candidates, Dictionary<string, AActor> byId) where T : AActor
         {
             if (actors == null)
             {
@@ -242,11 +242,11 @@ namespace WukongCombatKit
                     continue;
                 }
 
-                AddCandidate(candidates, byId, actor, origin, RaisedPoint(actor), false, true);
+                AddCandidate(candidates, byId, player, actor, origin, RaisedPoint(actor), false, true);
             }
         }
 
-        private static void AddCandidate(List<OmniHitCandidate> candidates, Dictionary<string, AActor> byId, AActor actor, FVector origin, FVector target, bool isEnemy, bool isSceneObject)
+        private static void AddCandidate(List<OmniHitCandidate> candidates, Dictionary<string, AActor> byId, AActor attacker, AActor actor, FVector origin, FVector target, bool isEnemy, bool isSceneObject)
         {
             string id = actor.GetUniqueID().ToString();
             if (byId.ContainsKey(id))
@@ -262,7 +262,7 @@ namespace WukongCombatKit
                 IsAlly = !isEnemy && !isSceneObject,
                 IsEnemy = isEnemy,
                 IsSceneObject = isSceneObject,
-                WallBlocked = IsWallBlocked(actor.World, origin, target, actor)
+                WallBlocked = IsWallBlocked(actor.World, attacker, actor, origin, target)
             });
             byId[id] = actor;
         }
@@ -335,44 +335,98 @@ namespace WukongCombatKit
             return false;
         }
 
-        private static bool IsWallBlocked(UWorld world, FVector origin, FVector target, AActor victim)
+        private static bool IsWallBlocked(UWorld world, AActor attacker, AActor victim, FVector origin, FVector target)
         {
             try
             {
-                FVector direction = target - origin;
-                float targetDistance = (float)direction.Size();
-                if (targetDistance <= 1f)
+                FVector[] sampleOrigins = BuildSamplePoints(attacker, origin, true);
+                FVector[] sampleTargets = BuildSamplePoints(victim, target, false);
+                for (int i = 0; i < sampleOrigins.Length; i++)
                 {
-                    return false;
-                }
-
-                FHitResultSimple hit = new FHitResultSimple();
-                bool hitSomething = BGUFuncLibSelectTargetsCS.LineTraceForHitWorldItem(world, origin, target, out hit);
-                bool hitTarget = false;
-                float hitDistance = targetDistance;
-                if (hitSomething && hit != null)
-                {
-                    if (hit.HitActor == victim || (victim != null && hit.HitActor == victim.GetAttachParentActor()))
+                    for (int j = 0; j < sampleTargets.Length; j++)
                     {
-                        hitTarget = true;
+                        if (!IsSingleRayBlocked(world, sampleOrigins[i], sampleTargets[j], victim))
+                        {
+                            return false;
+                        }
                     }
-
-                    hitDistance = (float)(hit.HitLocation - origin).Size();
                 }
 
-                float radius = 120f;
-                BGUCharacterCS character = victim as BGUCharacterCS;
-                if (character != null && character.CapsuleComponent != null)
-                {
-                    radius = Math.Max((float)character.CapsuleComponent.GetScaledCapsuleRadius(), 80f);
-                }
-
-                return OmniHitRules.IsTerrainBlocking(hitSomething, hitTarget, hitDistance, targetDistance, radius);
+                return true;
             }
             catch (Exception)
             {
                 return false;
             }
+        }
+
+        private static bool IsSingleRayBlocked(UWorld world, FVector origin, FVector target, AActor victim)
+        {
+            FVector direction = target - origin;
+            float targetDistance = (float)direction.Size();
+            if (targetDistance <= 1f)
+            {
+                return false;
+            }
+
+            FHitResultSimple hit = new FHitResultSimple();
+            bool hitSomething = BGUFuncLibSelectTargetsCS.LineTraceForHitWorldItem(world, origin, target, out hit);
+            bool hitTarget = false;
+            float hitDistance = targetDistance;
+            float hitZ = target.Z;
+            if (hitSomething && hit != null)
+            {
+                if (hit.HitActor == victim || (victim != null && hit.HitActor == victim.GetAttachParentActor()))
+                {
+                    hitTarget = true;
+                }
+
+                hitDistance = (float)(hit.HitLocation - origin).Size();
+                hitZ = (float)hit.HitLocation.Z;
+            }
+
+            float radius = 160f;
+            BGUCharacterCS character = victim as BGUCharacterCS;
+            if (character != null && character.CapsuleComponent != null)
+            {
+                radius = Math.Max((float)character.CapsuleComponent.GetScaledCapsuleRadius(), 120f);
+            }
+
+            return OmniHitRules.IsTerrainBlocking(
+                hitSomething,
+                hitTarget,
+                hitDistance,
+                targetDistance,
+                radius,
+                (float)origin.Z,
+                (float)target.Z,
+                hitZ);
+        }
+
+        private static FVector[] BuildSamplePoints(AActor actor, FVector fallback, bool extraHigh)
+        {
+            FVector basePoint = fallback;
+            float halfHeight = 90f;
+            BGUCharacterCS character = actor as BGUCharacterCS;
+            if (character != null && character.CapsuleComponent != null)
+            {
+                halfHeight = Math.Max((float)character.CapsuleComponent.GetScaledCapsuleHalfHeight(), 80f);
+                basePoint = BGUFuncLibActorTransformCS.BGUGetActorLocation(character);
+            }
+            else if (actor != null)
+            {
+                basePoint = BGUFuncLibActorTransformCS.BGUGetActorLocation(actor);
+            }
+
+            float chest = Math.Max(halfHeight * 0.7f, 70f);
+            float head = Math.Max(halfHeight * 1.6f, 160f);
+            float high = extraHigh ? Math.Max(halfHeight * 2.4f, 280f) : Math.Max(halfHeight * 2.1f, 220f);
+            return new FVector[]
+            {
+                basePoint + FVector.UpVector * chest,
+                basePoint + FVector.UpVector * head,
+                basePoint + FVector.UpVector * high
+            };
         }
 
         private static FVector RaisedPoint(AActor actor)
@@ -382,7 +436,7 @@ namespace WukongCombatKit
             BGUCharacterCS character = actor as BGUCharacterCS;
             if (character != null && character.CapsuleComponent != null)
             {
-                raise = Math.Max((float)character.CapsuleComponent.GetScaledCapsuleHalfHeight() * 0.6f, 60f);
+                raise = Math.Max((float)character.CapsuleComponent.GetScaledCapsuleHalfHeight() * 0.7f, 70f);
             }
 
             return location + FVector.UpVector * raise;

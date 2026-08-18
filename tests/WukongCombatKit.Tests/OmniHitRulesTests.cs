@@ -39,10 +39,18 @@ namespace WukongCombatKit.Tests
         [Fact]
         public void TerrainHitNearTargetIsNotAWall()
         {
-            Assert.False(OmniHitRules.IsTerrainBlocking(false, false, 0f, 80000f, 120f));
-            Assert.False(OmniHitRules.IsTerrainBlocking(true, true, 10f, 80000f, 120f));
-            Assert.False(OmniHitRules.IsTerrainBlocking(true, false, 79950f, 80000f, 120f));
-            Assert.True(OmniHitRules.IsTerrainBlocking(true, false, 400f, 80000f, 120f));
+            Assert.False(OmniHitRules.IsTerrainBlocking(false, false, 0f, 80000f, 120f, 0f, 0f, 0f));
+            Assert.False(OmniHitRules.IsTerrainBlocking(true, true, 10f, 80000f, 120f, 0f, 0f, 0f));
+            Assert.False(OmniHitRules.IsTerrainBlocking(true, false, 79950f, 80000f, 120f, 0f, 0f, 0f));
+            Assert.True(OmniHitRules.IsTerrainBlocking(true, false, 400f, 80000f, 120f, 0f, 0f, 0f));
+        }
+
+        [Fact]
+        public void AirborneAndHighGroundFloorHitsAreNotWalls()
+        {
+            Assert.False(OmniHitRules.IsTerrainBlocking(true, false, 200f, 2000f, 120f, 100f, 900f, 120f));
+            Assert.False(OmniHitRules.IsTerrainBlocking(true, false, 1850f, 2000f, 120f, 100f, 800f, 780f));
+            Assert.True(OmniHitRules.IsTerrainBlocking(true, false, 900f, 2000f, 120f, 100f, 140f, 130f));
         }
 
         [Fact]
