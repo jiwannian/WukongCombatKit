@@ -37,6 +37,15 @@ namespace WukongCombatKit.Tests
         }
 
         [Fact]
+        public void TerrainHitNearTargetIsNotAWall()
+        {
+            Assert.False(OmniHitRules.IsTerrainBlocking(false, false, 0f, 80000f, 120f));
+            Assert.False(OmniHitRules.IsTerrainBlocking(true, true, 10f, 80000f, 120f));
+            Assert.False(OmniHitRules.IsTerrainBlocking(true, false, 79950f, 80000f, 120f));
+            Assert.True(OmniHitRules.IsTerrainBlocking(true, false, 400f, 80000f, 120f));
+        }
+
+        [Fact]
         public void SceneObjectsOnlyWhenOriginalAttackWouldHitThem()
         {
             OmniHitCandidate crate = new OmniHitCandidate

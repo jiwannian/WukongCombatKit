@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace WukongCombatKit.Core
@@ -62,6 +63,22 @@ namespace WukongCombatKit.Core
             }
 
             return selected;
+        }
+
+        public static bool IsTerrainBlocking(bool hitSomething, bool hitTargetOrAttached, float hitDistance, float targetDistance, float targetRadius)
+        {
+            if (!hitSomething || hitTargetOrAttached)
+            {
+                return false;
+            }
+
+            float nearTarget = Math.Max(targetRadius, 150f);
+            if (hitDistance >= targetDistance - nearTarget)
+            {
+                return false;
+            }
+
+            return true;
         }
     }
 }

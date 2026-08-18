@@ -12,7 +12,6 @@ namespace WukongCombatKit
     public static class OmniHit
     {
         public static bool Available { get; private set; }
-        private static readonly HashSet<string> InjectedKeys = new HashSet<string>();
         private static Type _sweepCompType;
         private static MethodInfo _onSweepCheckHit;
 
@@ -33,24 +32,37 @@ namespace WukongCombatKit
                     return;
                 }
 
-                MethodInfo sweepInternal = AccessTools.Method(_sweepCompType, "SweepCheckInternal");
                 _onSweepCheckHit = AccessTools.Method(_sweepCompType, "OnSweepCheckHit");
-                if (sweepInternal == null)
+                MethodInfo sweepInternal = AccessTools.Method(_sweepCompType, "SweepCheckInternal");
+                MethodInfo combineSingle = AccessTools.Method(_sweepCompType, "CombineSweepCheckInternal_Single");
+                if (sweepInternal == null && combineSingle == null)
                 {
-                    ModLog.Error("OmniHit disabled: SweepCheckInternal not found");
+                    ModLog.Error("OmniHit disabled: sweep methods not found");
                     return;
                 }
 
-                harmony.Patch(
-                    sweepInternal,
-                    postfix: new HarmonyMethod(typeof(OmniHit), nameof(SweepCheckInternalPostfix)));
-                Available = true;
-                ModLog.Info("Patch registered: BUS_SweepCheckHitComp.SweepCheckInternal");
+                if (sweepInternal != null)
+                {
+                    harmony.Patch(
+                        sweepInternal,
+                        postfix: new HarmonyMethod(typeof(OmniHit), nameof(SweepCheckInternalPostfix)));
+                    ModLog.Info("Patch registered: BUS_SweepCheckHitComp.SweepCheckInternal");
+                    Available = true;
+                }
+
+                if (combineSingle != null)
+                {
+                    harmony.Patch(
+                        combineSingle,
+                        postfix: new HarmonyMethod(typeof(OmniHit), nameof(CombineSweepCheckInternalPostfix)));
+                    ModLog.Info("Patch registered: BUS_SweepCheckHitComp.CombineSweepCheckInternal_Single");
+                    Available = true;
+                }
             }
             catch (Exception ex)
             {
                 Available = false;
-                ModLog.Error("OmniHit SweepCheckInternal patch failed: " + ex.Message);
+                ModLog.Error("OmniHit sweep patch failed: " + ex.Message);
             }
         }
 
@@ -58,49 +70,80 @@ namespace WukongCombatKit
         {
             try
             {
-                if (!ConfigStore.Current.EnableOmniHit || __instance == null)
-                {
-                    return;
-                }
-
-                BGUPlayerCharacterCS player = ResolveOwner(__instance) as BGUPlayerCharacterCS;
-                if (player == null)
-                {
-                    return;
-                }
-
-                BUC_SweepCheckHitData hitData = BGU_DataUtil.GetUnPersistentReadOnlyData<BUC_SweepCheckHitData>(player);
-                if (hitData == null || hitData.SweepCheckConfigMap == null || hitData.SweepCheckConfigMap.Count == 0)
-                {
-                    return;
-                }
-
-                FSweepCheckUnitConfig config = null;
-                if (!string.IsNullOrEmpty(NotifyInstID))
-                {
-                    hitData.SweepCheckConfigMap.TryGetValue(NotifyInstID, out config);
-                }
-
-                if (config == null)
-                {
-                    foreach (KeyValuePair<string, FSweepCheckUnitConfig> pair in hitData.SweepCheckConfigMap)
-                    {
-                        NotifyInstID = pair.Key;
-                        config = pair.Value;
-                    }
-                }
-
-                if (config == null)
-                {
-                    return;
-                }
-
-                ApplyOmniHits(__instance, player, config, NotifyInstID);
+                ApplyFromSweep(__instance, NotifyInstID, null);
             }
             catch (Exception ex)
             {
                 ModLog.Error("OmniHit SweepCheckInternal: " + ex.Message);
             }
+        }
+
+        public static void CombineSweepCheckInternalPostfix(object __instance, FSweepCheckCombineInfo CombineInfo, string EndNotifyID)
+        {
+            try
+            {
+                ApplyFromSweep(__instance, EndNotifyID, CombineInfo);
+            }
+            catch (Exception ex)
+            {
+                ModLog.Error("OmniHit CombineSweepCheck: " + ex.Message);
+            }
+        }
+
+        private static void ApplyFromSweep(object sweepComp, string notifyId, FSweepCheckCombineInfo combineInfo)
+        {
+            if (!ConfigStore.Current.EnableOmniHit || sweepComp == null)
+            {
+                return;
+            }
+
+            BGUPlayerCharacterCS player = ResolveOwner(sweepComp) as BGUPlayerCharacterCS;
+            if (player == null)
+            {
+                return;
+            }
+
+            BUC_SweepCheckHitData hitData = BGU_DataUtil.GetUnPersistentReadOnlyData<BUC_SweepCheckHitData>(player);
+            if (hitData == null || hitData.SweepCheckConfigMap == null || hitData.SweepCheckConfigMap.Count == 0)
+            {
+                return;
+            }
+
+            FSweepCheckUnitConfig config = null;
+            if (!string.IsNullOrEmpty(notifyId))
+            {
+                hitData.SweepCheckConfigMap.TryGetValue(notifyId, out config);
+            }
+
+            if (config == null && combineInfo != null && combineInfo.CombinedConfigShapeNotifyIDSet != null)
+            {
+                for (int i = 0; i < combineInfo.CombinedConfigShapeNotifyIDSet.Count; i++)
+                {
+                    string combinedId = combineInfo.CombinedConfigShapeNotifyIDSet[i];
+                    if (hitData.SweepCheckConfigMap.TryGetValue(combinedId, out config))
+                    {
+                        notifyId = combinedId;
+                        break;
+                    }
+                }
+            }
+
+            if (config == null)
+            {
+                foreach (KeyValuePair<string, FSweepCheckUnitConfig> pair in hitData.SweepCheckConfigMap)
+                {
+                    notifyId = pair.Key;
+                    config = pair.Value;
+                    break;
+                }
+            }
+
+            if (config == null)
+            {
+                return;
+            }
+
+            ApplyOmniHits(sweepComp, player, config, notifyId);
         }
 
         private static void ApplyOmniHits(object sweepComp, BGUPlayerCharacterCS player, FSweepCheckUnitConfig config, string notifyId)
@@ -111,7 +154,7 @@ namespace WukongCombatKit
                 return;
             }
 
-            FVector origin = BGUFuncLibActorTransformCS.BGUGetActorLocation(player);
+            FVector origin = RaisedPoint(player);
             List<BGUCharacterCS> characters = new List<BGUCharacterCS>(UGameplayStatics.GetAllActorsOfClass<BGUCharacterCS>(world));
             if (characters.Count == 0)
             {
@@ -130,7 +173,7 @@ namespace WukongCombatKit
                     continue;
                 }
 
-                FVector target = BGUFuncLibActorTransformCS.BGUGetActorLocation(character);
+                FVector target = RaisedPoint(character);
                 float distance = (float)(target - origin).Size();
                 bool isEnemy = false;
                 try
@@ -167,6 +210,7 @@ namespace WukongCombatKit
                 return;
             }
 
+            HashSet<string> injectedThisSweep = new HashSet<string>();
             int injected = 0;
             foreach (string id in selected)
             {
@@ -176,8 +220,7 @@ namespace WukongCombatKit
                     continue;
                 }
 
-                string key = notifyId + ":" + victim.GetUniqueID();
-                if (!InjectedKeys.Add(key))
+                if (!injectedThisSweep.Add(id))
                 {
                     continue;
                 }
@@ -221,33 +264,52 @@ namespace WukongCombatKit
             try
             {
                 FVector direction = target - origin;
-                if (direction.IsNearlyZero())
+                float targetDistance = (float)direction.Size();
+                if (targetDistance <= 1f)
                 {
                     return false;
                 }
 
                 FHitResultSimple hit = new FHitResultSimple();
-                if (!BGUFuncLibSelectTargetsCS.LineTraceForHitWorldItem(world, origin, target, out hit))
+                bool hitSomething = BGUFuncLibSelectTargetsCS.LineTraceForHitWorldItem(world, origin, target, out hit);
+                bool hitTarget = false;
+                float hitDistance = targetDistance;
+                if (hitSomething && hit != null)
                 {
-                    return false;
+                    if (hit.HitActor == victim || (victim != null && hit.HitActor == victim.GetAttachParentActor()))
+                    {
+                        hitTarget = true;
+                    }
+
+                    hitDistance = (float)(hit.HitLocation - origin).Size();
                 }
 
-                if (hit == null || hit.HitActor == null)
+                float radius = 120f;
+                BGUCharacterCS character = victim as BGUCharacterCS;
+                if (character != null && character.CapsuleComponent != null)
                 {
-                    return true;
+                    radius = Math.Max((float)character.CapsuleComponent.GetScaledCapsuleRadius(), 80f);
                 }
 
-                if (hit.HitActor == victim || hit.HitActor == victim.GetAttachParentActor())
-                {
-                    return false;
-                }
-
-                return true;
+                return OmniHitRules.IsTerrainBlocking(hitSomething, hitTarget, hitDistance, targetDistance, radius);
             }
             catch (Exception)
             {
-                return true;
+                return false;
             }
+        }
+
+        private static FVector RaisedPoint(AActor actor)
+        {
+            FVector location = BGUFuncLibActorTransformCS.BGUGetActorLocation(actor);
+            float raise = 80f;
+            BGUCharacterCS character = actor as BGUCharacterCS;
+            if (character != null && character.CapsuleComponent != null)
+            {
+                raise = Math.Max((float)character.CapsuleComponent.GetScaledCapsuleHalfHeight() * 0.6f, 60f);
+            }
+
+            return location + FVector.UpVector * raise;
         }
 
         private static AActor ResolveOwner(object instance)

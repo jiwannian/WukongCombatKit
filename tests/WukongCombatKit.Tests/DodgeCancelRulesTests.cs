@@ -19,6 +19,27 @@ namespace WukongCombatKit.Tests
         }
 
         [Fact]
+        public void UnknownSkillDuringAttack_AllowsDodgeCancel()
+        {
+            Assert.True(DodgeCancelRules.ShouldAllowDodgeCancel(new DodgeCancelContext
+            {
+                Enabled = true,
+                IsLocalPlayer = true,
+                IsAttacking = true,
+                SkillType = null,
+                LastAction = null
+            }));
+            Assert.True(DodgeCancelRules.ShouldAllowDodgeCancel(new DodgeCancelContext
+            {
+                Enabled = true,
+                IsLocalPlayer = true,
+                IsAttacking = true,
+                SkillType = "",
+                LastAction = "EAttackLight"
+            }));
+        }
+
+        [Fact]
         public void ChargeOrSpellOrTransform_DoesNotAllowDodgeCancel()
         {
             Assert.False(DodgeCancelRules.ShouldAllowDodgeCancel(CreateBlocked("ChargeSkillBegin", "HeavyAttack")));

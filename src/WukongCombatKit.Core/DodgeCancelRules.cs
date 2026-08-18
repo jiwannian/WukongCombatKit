@@ -52,7 +52,7 @@ namespace WukongCombatKit.Core
 
         public static bool IsLightAttackCombo(string skillType, string lastAction)
         {
-            if (!IsNormalStaffAttack(skillType))
+            if (!string.IsNullOrEmpty(skillType) && !IsNormalStaffAttack(skillType))
             {
                 return false;
             }
@@ -74,10 +74,15 @@ namespace WukongCombatKit.Core
                 return false;
             }
 
-            return ContainsToken(lastAction, "Light") ||
-                   ContainsToken(lastAction, "Combo") ||
-                   ContainsToken(lastAction, "Normal") ||
-                   ContainsToken(lastAction, "Attack");
+            if (ContainsToken(lastAction, "Light") ||
+                ContainsToken(lastAction, "Combo") ||
+                ContainsToken(lastAction, "Normal") ||
+                ContainsToken(lastAction, "Attack"))
+            {
+                return true;
+            }
+
+            return string.IsNullOrEmpty(skillType) || IsNormalStaffAttack(skillType);
         }
 
         public static bool IsNormalStaffAttack(string skillType)

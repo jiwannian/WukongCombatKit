@@ -11,6 +11,8 @@ namespace WukongCombatKit
     public static class DodgeCancel
     {
         public static bool Available { get; private set; }
+        private static MethodInfo _triggerDodge;
+        private static MethodInfo _tryTriggerRealDodge;
 
         public static void Register(Harmony harmony)
         {
@@ -23,9 +25,11 @@ namespace WukongCombatKit
             try
             {
                 MethodInfo doAttackLogic = AccessTools.Method(typeof(BUS_PlayerInputActionComp), "DoAttackLogic");
-                if (doAttackLogic == null)
+                _triggerDodge = AccessTools.Method(typeof(BUS_PlayerInputActionComp), "TriggerDodge");
+                _tryTriggerRealDodge = AccessTools.Method(typeof(BUS_PlayerInputActionComp), "TryTriggerRealDodge");
+                if (doAttackLogic == null || _triggerDodge == null)
                 {
-                    ModLog.Error("DodgeCancel disabled: DoAttackLogic not found");
+                    ModLog.Error("DodgeCancel disabled: DoAttackLogic/TriggerDodge not found");
                 }
                 else
                 {
@@ -46,8 +50,7 @@ namespace WukongCombatKit
                 MethodInfo checkDodgeState = AccessTools.Method(typeof(GSSkillCastChecker), "CheckDodgeState");
                 if (checkDodgeState == null)
                 {
-                    ModLog.Error("DodgeCancel disabled: CheckDodgeState not found");
-                    Available = false;
+                    ModLog.Error("DodgeCancel CheckDodgeState not found");
                     return;
                 }
 
@@ -59,44 +62,52 @@ namespace WukongCombatKit
             }
             catch (Exception ex)
             {
-                Available = false;
                 ModLog.Error("DodgeCancel CheckDodgeState patch failed: " + ex.Message);
             }
         }
 
-        public static void DoAttackLogicPrefix(object __instance, EInputActionType InputActionType)
+        public static bool DoAttackLogicPrefix(object __instance, EInputActionType InputActionType)
         {
             try
             {
                 if (!ConfigStore.Current.EnableDodgeCancel || InputActionType != EInputActionType.Dodge)
                 {
-                    return;
+                    return true;
                 }
 
                 BGUCharacterCS player = ResolveOwner(__instance) as BGUCharacterCS;
                 if (!ShouldAllow(player))
                 {
-                    return;
+                    return true;
                 }
 
-                IBUC_UnitStateData unitState = BGU_DataUtil.GetReadOnlyData<IBUC_UnitStateData, BUC_UnitStateData>(player);
-                if (unitState == null || unitState.HasState(EBGUUnitState.InDodgeWindow))
+                OpenDodgeWindow(player);
+                ESkillDirection direction = ReadDodgeDirection(player);
+                if (_triggerDodge != null)
                 {
-                    return;
+                    _triggerDodge.Invoke(__instance, new object[] { direction });
                 }
 
-                BUS_GSEventCollection events = BUS_EventCollectionCS.Get(player);
-                if (events == null)
+                if (_tryTriggerRealDodge != null)
                 {
-                    return;
+                    _tryTriggerRealDodge.Invoke(__instance, null);
+                }
+                else
+                {
+                    BUS_GSEventCollection events = BUS_EventCollectionCS.Get(player);
+                    if (events != null)
+                    {
+                        events.Evt_BeginPreciseDodge.Invoke(direction);
+                    }
                 }
 
-                events.Evt_UnitStateTrigger.Invoke(EBUStateTrigger.EnterDodgeWindow, 0.2f, true);
-                ModLog.Debug("Opened dodge window for light-attack cancel");
+                ModLog.Debug("Same-frame dodge cancel from light attack");
+                return false;
             }
             catch (Exception ex)
             {
                 ModLog.Error("DodgeCancel DoAttackLogic: " + ex.Message);
+                return true;
             }
         }
 
@@ -175,8 +186,8 @@ namespace WukongCombatKit
                     IsDeadOrDying = unitState.HasState(EBGUUnitState.Dead) || unitState.HasState(EBGUUnitState.LifeSavingHair_FakeDead),
                     IsCharging = charge != null && charge.IsCastingChargeSkill,
                     IsTransforming = transforming,
-                    IsAlreadyDodging = unitState.HasState(EBGUUnitState.InDodgeWindow) && skillType == "RollSkill",
-                    IsCastingMagic = unitState.HasState(EBGUUnitState.InMagicWindow) && !DodgeCancelRules.IsNormalStaffAttack(skillType),
+                    IsAlreadyDodging = unitState.HasState(EBGUUnitState.InDodgeWindow) && string.Equals(skillType, "RollSkill", StringComparison.OrdinalIgnoreCase),
+                    IsCastingMagic = unitState.HasState(EBGUUnitState.InMagicWindow) && !string.IsNullOrEmpty(skillType) && !DodgeCancelRules.IsNormalStaffAttack(skillType),
                     IsCastingVigor = unitState.HasState(EBGUUnitState.InVigorWindow),
                     SkillType = skillType,
                     LastAction = lastAction
@@ -185,6 +196,42 @@ namespace WukongCombatKit
             catch (Exception)
             {
                 return false;
+            }
+        }
+
+        private static void OpenDodgeWindow(BGUCharacterCS player)
+        {
+            BUS_GSEventCollection events = BUS_EventCollectionCS.Get(player);
+            if (events == null)
+            {
+                return;
+            }
+
+            events.Evt_UnitStateTrigger.Invoke(EBUStateTrigger.EnterDodgeWindow, 0.25f, true);
+        }
+
+        private static ESkillDirection ReadDodgeDirection(BGUCharacterCS player)
+        {
+            try
+            {
+                AController controller = player.GetController();
+                IBPC_InputData input = controller != null
+                    ? BGU_DataUtil.GetReadOnlyData<IBPC_InputData, BPC_InputData>(controller)
+                    : null;
+                IBUC_PlayerInputConfigData config = BGU_DataUtil.GetUnPersistentReadOnlyData<IBUC_PlayerInputConfigData, BUC_PlayerInputConfigData>(player);
+                if (input == null)
+                {
+                    return ESkillDirection.Forward;
+                }
+
+                float sideways = input.GetInputValue(GSBattleActionEn.MoveSideways);
+                float forward = input.GetInputValue(GSBattleActionEn.MoveForward);
+                float fixLine = config != null ? config.DodgeInputFixLine : 0.4f;
+                return BGUFuncLibInput.CalcInputDir(sideways, forward, fixLine);
+            }
+            catch (Exception)
+            {
+                return ESkillDirection.Forward;
             }
         }
 
