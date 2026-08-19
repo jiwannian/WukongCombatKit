@@ -216,8 +216,8 @@ namespace WukongCombatKit
                     continue;
                 }
 
-                FVector target = RaisedPoint(character);
-                if ((target - origin).Size() > maxRange)
+                FVector target = AimPoint(character);
+                if (DistanceToActor(origin, character, target) > maxRange)
                 {
                     continue;
                 }
@@ -260,8 +260,8 @@ namespace WukongCombatKit
                     continue;
                 }
 
-                FVector target = RaisedPoint(actor);
-                if ((target - origin).Size() > maxRange)
+                FVector target = AimPoint(actor);
+                if (DistanceToActor(origin, actor, target) > maxRange)
                 {
                     continue;
                 }
@@ -363,9 +363,16 @@ namespace WukongCombatKit
         {
             try
             {
-                FVector from = attacker != null ? RaisedPoint(attacker) : origin;
-                FVector to = victim != null ? RaisedPoint(victim) : target;
-                return IsSingleRayBlocked(world, from, to, victim);
+                FVector from = attacker != null ? AimPoint(attacker) : origin;
+                FVector to = victim != null ? AimPoint(victim) : target;
+                if (!IsSingleRayBlocked(world, from, to, victim))
+                {
+                    return false;
+                }
+
+                FVector highFrom = from + FVector.UpVector * 180f;
+                FVector highTo = to + FVector.UpVector * 220f;
+                return IsSingleRayBlocked(world, highFrom, highTo, victim);
             }
             catch (Exception)
             {
@@ -389,7 +396,7 @@ namespace WukongCombatKit
             float hitZ = target.Z;
             if (hitSomething && hit != null)
             {
-                if (hit.HitActor == victim || (victim != null && hit.HitActor == victim.GetAttachParentActor()))
+                if (IsSameActorOrAttached(hit.HitActor, victim))
                 {
                     hitTarget = true;
                 }
@@ -398,12 +405,7 @@ namespace WukongCombatKit
                 hitZ = (float)hit.HitLocation.Z;
             }
 
-            float radius = 160f;
-            BGUCharacterCS character = victim as BGUCharacterCS;
-            if (character != null && character.CapsuleComponent != null)
-            {
-                radius = Math.Max((float)character.CapsuleComponent.GetScaledCapsuleRadius(), 120f);
-            }
+            float radius = EstimateRadius(victim);
 
             return OmniHitRules.IsTerrainBlocking(
                 hitSomething,
@@ -418,15 +420,94 @@ namespace WukongCombatKit
 
         private static FVector RaisedPoint(AActor actor)
         {
+            return AimPoint(actor);
+        }
+
+        private static FVector AimPoint(AActor actor)
+        {
             FVector location = BGUFuncLibActorTransformCS.BGUGetActorLocation(actor);
-            float raise = 80f;
-            BGUCharacterCS character = actor as BGUCharacterCS;
-            if (character != null && character.CapsuleComponent != null)
+            float raise = Math.Max(EstimateHalfHeight(actor) * 0.55f, 80f);
+            return location + FVector.UpVector * raise;
+        }
+
+        private static float DistanceToActor(FVector origin, AActor actor, FVector fallbackTarget)
+        {
+            float centerDistance = (float)(fallbackTarget - origin).Size();
+            float radius = EstimateRadius(actor);
+            return Math.Max(0f, centerDistance - radius);
+        }
+
+        private static float EstimateRadius(AActor actor)
+        {
+            float radius = 160f;
+            try
             {
-                raise = Math.Max((float)character.CapsuleComponent.GetScaledCapsuleHalfHeight() * 0.7f, 70f);
+                FVector origin;
+                FVector boxExtent;
+                actor.GetActorBounds(false, out origin, out boxExtent);
+                float horizontal = (float)Math.Max(boxExtent.X, boxExtent.Y);
+                float vertical = (float)boxExtent.Z;
+                radius = Math.Max(Math.Max(horizontal, vertical * 0.6f), 160f);
+            }
+            catch
+            {
+                BGUCharacterCS character = actor as BGUCharacterCS;
+                if (character != null && character.CapsuleComponent != null)
+                {
+                    radius = Math.Max((float)character.CapsuleComponent.GetScaledCapsuleRadius(), 160f);
+                }
             }
 
-            return location + FVector.UpVector * raise;
+            return Math.Min(radius, 8000f);
+        }
+
+        private static float EstimateHalfHeight(AActor actor)
+        {
+            try
+            {
+                FVector origin;
+                FVector boxExtent;
+                actor.GetActorBounds(false, out origin, out boxExtent);
+                return Math.Max((float)boxExtent.Z, 80f);
+            }
+            catch
+            {
+                BGUCharacterCS character = actor as BGUCharacterCS;
+                if (character != null && character.CapsuleComponent != null)
+                {
+                    return Math.Max((float)character.CapsuleComponent.GetScaledCapsuleHalfHeight(), 80f);
+                }
+            }
+
+            return 80f;
+        }
+
+        private static bool IsSameActorOrAttached(AActor hitActor, AActor victim)
+        {
+            if (hitActor == null || victim == null)
+            {
+                return false;
+            }
+
+            if (hitActor == victim || hitActor == victim.GetAttachParentActor())
+            {
+                return true;
+            }
+
+            AActor parent = hitActor.GetAttachParentActor();
+            int guard = 0;
+            while (parent != null && guard < 6)
+            {
+                if (parent == victim)
+                {
+                    return true;
+                }
+
+                parent = parent.GetAttachParentActor();
+                guard++;
+            }
+
+            return string.Equals(hitActor.GetName(), victim.GetName(), StringComparison.Ordinal);
         }
 
         private static AActor ResolveOwner(object instance)

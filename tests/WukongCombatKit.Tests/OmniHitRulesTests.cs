@@ -46,6 +46,14 @@ namespace WukongCombatKit.Tests
         }
 
         [Fact]
+        public void LargeBossBodyHitsAreNotWalls()
+        {
+            Assert.False(OmniHitRules.IsTerrainBlocking(true, false, 7000f, 9000f, 2500f, 100f, 400f, 350f));
+            Assert.False(OmniHitRules.IsTerrainBlocking(true, false, 1200f, 9000f, 2500f, 100f, 400f, 80f));
+            Assert.True(OmniHitRules.IsTerrainBlocking(true, false, 1200f, 9000f, 2500f, 100f, 400f, 280f));
+        }
+
+        [Fact]
         public void AirborneAndHighGroundFloorHitsAreNotWalls()
         {
             Assert.False(OmniHitRules.IsTerrainBlocking(true, false, 200f, 2000f, 120f, 100f, 900f, 120f));

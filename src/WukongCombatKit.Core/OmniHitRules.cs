@@ -89,13 +89,21 @@ namespace WukongCombatKit.Core
             float lowerZ = Math.Min(originZ, targetZ);
             float upperZ = Math.Max(originZ, targetZ);
             float verticalGap = upperZ - lowerZ;
+            float remaining = targetDistance - hitDistance;
+            float bodyBottom = Math.Min(originZ, targetZ) - Math.Max(targetRadius * 0.35f, 80f);
+            float bodyTop = Math.Max(originZ, targetZ) + Math.Max(targetRadius, 160f);
 
             if (hitZ < lowerZ - 40f)
             {
                 return false;
             }
 
-            if (verticalGap >= 120f && hitZ <= lowerZ + Math.Max(targetRadius, 80f))
+            if (verticalGap >= 120f && hitZ <= lowerZ + 80f)
+            {
+                return false;
+            }
+
+            if (remaining <= nearTarget && hitZ >= bodyBottom && hitZ <= bodyTop)
             {
                 return false;
             }
