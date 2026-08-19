@@ -14,8 +14,6 @@ namespace WukongCombatKit
         public static bool Available { get; private set; }
         private static Type _sweepCompType;
         private static MethodInfo _onSweepCheckHit;
-        private static string _lastSweepKey;
-        private static long _lastSweepTicks;
 
         public static void Register(Harmony harmony)
         {
@@ -145,15 +143,6 @@ namespace WukongCombatKit
                 return;
             }
 
-            string sweepKey = player.GetUniqueID() + ":" + notifyId + ":" + config.TriggerSkillID;
-            long now = DateTime.UtcNow.Ticks;
-            if (sweepKey == _lastSweepKey && now - _lastSweepTicks < TimeSpan.FromMilliseconds(50).Ticks)
-            {
-                return;
-            }
-
-            _lastSweepKey = sweepKey;
-            _lastSweepTicks = now;
             ApplyOmniHits(sweepComp, player, config, notifyId);
         }
 
@@ -188,6 +177,11 @@ namespace WukongCombatKit
                 }
 
                 if (!injectedThisSweep.Add(id))
+                {
+                    continue;
+                }
+
+                if (AlreadyHitByOriginalSweep(victim, notifyId, config))
                 {
                     continue;
                 }
@@ -278,15 +272,17 @@ namespace WukongCombatKit
                 return;
             }
 
+            float surfaceDistance = DistanceToActor(origin, actor, target);
+            bool skipWallCheck = isEnemy && EstimateRadius(actor) >= 400f;
             candidates.Add(new OmniHitCandidate
             {
                 Id = id,
-                Distance = (float)(target - origin).Size(),
+                Distance = surfaceDistance,
                 IsSelf = false,
                 IsAlly = !isEnemy && !isSceneObject,
                 IsEnemy = isEnemy,
                 IsSceneObject = isSceneObject,
-                WallBlocked = IsWallBlocked(actor.World, attacker, actor, origin, target)
+                WallBlocked = skipWallCheck ? false : IsWallBlocked(actor.World, attacker, actor, origin, target)
             });
             byId[id] = actor;
         }
@@ -311,13 +307,13 @@ namespace WukongCombatKit
                     {
                         victim,
                         config.SweepCheckProtectTime,
-                        notifyId,
+                        notifyId + "_omni",
                         req,
                         config.AbnormalStateEffectList,
                         config.EffectsWithCondition_Before,
                         config.EffectIDList,
                         config.EffectsWithCondition_After,
-                        config.SweepCheckGroupID,
+                        -1,
                         config.FromInstanceID
                     };
                     _onSweepCheckHit.Invoke(sweepComp, args);
@@ -354,6 +350,33 @@ namespace WukongCombatKit
             catch (Exception ex)
             {
                 ModLog.Error("OmniHit inject failed: " + ex.Message);
+            }
+
+            return false;
+        }
+
+        private static bool AlreadyHitByOriginalSweep(AActor victim, string notifyId, FSweepCheckUnitConfig config)
+        {
+            try
+            {
+                BUC_UnitBeAttackedFequenceData data = BGU_DataUtil.GetReadOnlyData<BUC_UnitBeAttackedFequenceData>(victim);
+                if (data == null)
+                {
+                    return false;
+                }
+
+                if (!string.IsNullOrEmpty(notifyId) && !data.CheckBeAttackedFequenceData(notifyId))
+                {
+                    return true;
+                }
+
+                if (config != null && !data.CheckBeAttackedGroupInfo(config.SweepCheckGroupID, config.FromInstanceID))
+                {
+                    return true;
+                }
+            }
+            catch
+            {
             }
 
             return false;

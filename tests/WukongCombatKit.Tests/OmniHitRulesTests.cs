@@ -62,6 +62,17 @@ namespace WukongCombatKit.Tests
         }
 
         [Fact]
+        public void SurfaceDistanceKeepsHugeBossInRange()
+        {
+            List<string> hits = OmniHitRules.SelectVisibleTargets(new[]
+            {
+                new OmniHitCandidate { Id = "miaoyin", Distance = 8200f, IsEnemy = true }
+            }, 10000f, false);
+
+            Assert.Equal(new[] { "miaoyin" }, hits);
+        }
+
+        [Fact]
         public void SceneObjectsAreSelectedWhenRequested()
         {
             OmniHitCandidate crate = new OmniHitCandidate
